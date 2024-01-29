@@ -1,0 +1,11 @@
+Import('env')
+
+path = env.Dir('.').srcnode().abspath
+
+env.Append(CPPPATH = ["%s/GameNetworkingSockets/include/" % path])
+
+env.Append(LIBS = ["GameNetworkingSockets"])
+env.Append(LIBPATH = ["%s"])
+
+src_list = ["register_types.cpp", "GodotNetworkingSockets.cpp"]
+env.add_source_files(env.modules_sources, src_list)

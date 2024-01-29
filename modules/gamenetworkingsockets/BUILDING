@@ -1,0 +1,16 @@
+Before being able to compile Godot with this module the GameNetworkingSockets library needs to be compiled separately because configuring it inside SCons is too much of a hassle for me.
+
+----- Windows -----
+
+Open a Visual Studio command prompt from the GameNetworkingSockets directory next to this file.
+
+> git clone https://github.com/microsoft/vcpkg
+> .\vcpkg\bootstrap-vcpkg.bat
+> cmake -S . -B build -G Ninja -DUSE_STEAMWEBRTC=ON
+> cd build
+> ninja
+> copy .\src\GameNetworkingSockets.lib .\..\..\..\..\GameNetworkingSockets.<platform>.<target>.[dev].<arch>.[mono].lib
+
+(e.g. copy .\src\GameNetworkingSockets.lib .\..\..\GameNetworkingSockets.windows.editor.x86_64.lib)
+
+Then compile Godot like usual. Don't forget to add the shared libraries to the Godot executable.
