@@ -6,6 +6,7 @@
 #include "core/object/ref_counted.h"
 #include "core/templates/vector.h"
 #include "steam/steamnetworkingsockets.h"
+#include "audio_stream_netreceive.h"
 
 class GodotNetSockets : public RefCounted {
 	GDCLASS(GodotNetSockets, RefCounted);
@@ -26,6 +27,7 @@ class GodotNetMessageOut : public RefCounted {
 	uint32_t m_sizeBytes;
 	size_t m_realSize;
 	void* m_data;
+	bool m_ownsData;
 protected:
 	static void _bind_methods();
 
@@ -37,6 +39,7 @@ public:
 
 	void* GetData();
 	uint32_t GetSize();
+	void RemoveOwnership();
 
 	void SetBool(bool value);
 	void SetInt8(int8_t value);
@@ -130,9 +133,9 @@ public:
 	static void SetOnClientConnected(Callable func);
 	static void SetOnClientDisconnected(Callable func);
 
-	static void SendTo(uint32_t clientId, GodotNetMessageOut* msg, int flags);
-	static void SendToAll(GodotNetMessageOut* msg, int flags);
-	static void SendToAllExcept(uint32_t clientId, GodotNetMessageOut* msg, int flags);
+	static void SendTo(uint32_t clientId, Ref<GodotNetMessageOut> msg, int flags, uint16_t lane);
+	static void SendToAll(Ref<GodotNetMessageOut> msg, int flags, uint16_t lane);
+	static void SendToAllExcept(uint32_t clientId, Ref<GodotNetMessageOut> msg, int flags, uint16_t lane);
 };
 
 class GodotNetClient : public RefCounted {
@@ -142,6 +145,7 @@ class GodotNetClient : public RefCounted {
 	static Thread m_pollThread;
 	static bool m_running;
 	static Mutex m_runningMutex;
+	static HashMap<uint16_t, AudioStreamPlaybackNetReceive*> m_audioReceivers;
 
 	static Callable m_onMessage;
 	static Callable m_onConnected;
@@ -163,7 +167,11 @@ public:
 	static void SetOnConnected(Callable func);
 	static void SetOnDisconnected(Callable func);
 
-	static void Send(GodotNetMessageOut* msg, int flags);
+	static void Send(Ref<GodotNetMessageOut> msg, int flags, uint16_t lane);
+	static void SendRaw(void* data, uint32_t size, int flags, uint16_t lane);
+
+	static void RegisterAudioReceiver(uint16_t clientId, AudioStreamPlaybackNetReceive* receiver);
+	static void UnregisterAudioReceiver(uint16_t clientId);
 };
 
 #endif

@@ -1,7 +1,10 @@
 #include "GodotNetworkingSockets.h"
 #include "steam/isteamnetworkingutils.h"
-#include <cstdarg>
 #include <chrono>
+#include <cstdarg>
+
+constexpr uint16_t NUM_LANES = 2;
+const int32_t LANE_PRIORITIES[NUM_LANES] = { 1, 0 };
 
 void GodotNetSockets::_bind_methods() {
 	ClassDB::bind_static_method("GodotNetSockets", D_METHOD("set_print_function", "func"), &GodotNetSockets::SetPrintFunction);
@@ -23,8 +26,8 @@ void GodotNetSockets::SetPrintFunction(Callable func) {
 	printFunction = func;
 }
 
-#ifdef DEV_ENABLED
-inline void GDPrint(const char* format, ...) {
+#if 1
+inline void GDPrint(const char *format, ...) {
 	if (printFunction.is_null()) {
 		return;
 	}
@@ -38,11 +41,12 @@ inline void GDPrint(const char* format, ...) {
 	printFunction.call(String(buffer));
 }
 #else
-inline void GDPrint(const char* format, ...) {
+inline void GDPrint(const char *format, ...) {
 }
 #endif
 
-ISteamNetworkingSockets* pInterface = nullptr;
+ISteamNetworkingSockets *pInterface = nullptr;
+ISteamNetworkingUtils *pUtils = nullptr;
 
 bool GodotNetSockets::Init() {
 	SteamDatagramErrMsg errMsg;
@@ -52,6 +56,7 @@ bool GodotNetSockets::Init() {
 	}
 
 	pInterface = SteamNetworkingSockets();
+	pUtils = SteamNetworkingUtils();
 
 	GDPrint("Game networking sockets initialized");
 	return true;
@@ -96,6 +101,7 @@ GodotNetMessageOut::GodotNetMessageOut() {
 	m_sizeBytes = 0;
 	m_realSize = 0;
 	m_data = nullptr;
+	m_ownsData = true;
 }
 
 Ref<GodotNetMessageOut> GodotNetMessageOut::Build(uint32_t sizeBytes) {
@@ -109,15 +115,21 @@ Ref<GodotNetMessageOut> GodotNetMessageOut::Build(uint32_t sizeBytes) {
 }
 
 GodotNetMessageOut::~GodotNetMessageOut() {
-	memfree(m_data);
+	if (m_ownsData) {
+		memfree(m_data);
+	}
 }
 
-void* GodotNetMessageOut::GetData() {
+void *GodotNetMessageOut::GetData() {
 	return m_data;
 }
 
 uint32_t GodotNetMessageOut::GetSize() {
 	return m_realSize;
+}
+
+void GodotNetMessageOut::RemoveOwnership() {
+	m_ownsData = false;
 }
 
 #define SET_IMPL(name, type)                                      \
@@ -126,7 +138,7 @@ uint32_t GodotNetMessageOut::GetSize() {
 			GDPrint("Failed to set, not enough space in buffer"); \
 			return;                                               \
 		}                                                         \
-																  \
+                                                                  \
 		*(type *)((uint8_t *)m_data + m_realSize) = value;        \
 		m_realSize += sizeof(type);                               \
 	}
@@ -149,9 +161,9 @@ void GodotNetMessageOut::SetVector2(Vector2 value) {
 		return;
 	}
 
-	*(float*)((uint8_t*)m_data + m_realSize) = value.x;
+	*(float *)((uint8_t *)m_data + m_realSize) = value.x;
 	m_realSize += sizeof(float);
-	*(float*)((uint8_t*)m_data + m_realSize) = value.y;
+	*(float *)((uint8_t *)m_data + m_realSize) = value.y;
 	m_realSize += sizeof(float);
 }
 
@@ -161,11 +173,11 @@ void GodotNetMessageOut::SetVector3(Vector3 value) {
 		return;
 	}
 
-	*(float*)((uint8_t*)m_data + m_realSize) = value.x;
+	*(float *)((uint8_t *)m_data + m_realSize) = value.x;
 	m_realSize += sizeof(float);
-	*(float*)((uint8_t*)m_data + m_realSize) = value.y;
+	*(float *)((uint8_t *)m_data + m_realSize) = value.y;
 	m_realSize += sizeof(float);
-	*(float*)((uint8_t*)m_data + m_realSize) = value.z;
+	*(float *)((uint8_t *)m_data + m_realSize) = value.z;
 	m_realSize += sizeof(float);
 }
 
@@ -175,13 +187,13 @@ void GodotNetMessageOut::SetQuaternion(Quaternion value) {
 		return;
 	}
 
-	*(float*)((uint8_t*)m_data + m_realSize) = value.x;
+	*(float *)((uint8_t *)m_data + m_realSize) = value.x;
 	m_realSize += sizeof(float);
-	*(float*)((uint8_t*)m_data + m_realSize) = value.y;
+	*(float *)((uint8_t *)m_data + m_realSize) = value.y;
 	m_realSize += sizeof(float);
-	*(float*)((uint8_t*)m_data + m_realSize) = value.z;
+	*(float *)((uint8_t *)m_data + m_realSize) = value.z;
 	m_realSize += sizeof(float);
-	*(float*)((uint8_t*)m_data + m_realSize) = value.w;
+	*(float *)((uint8_t *)m_data + m_realSize) = value.w;
 	m_realSize += sizeof(float);
 }
 
@@ -212,7 +224,7 @@ GodotNetMessageIn::GodotNetMessageIn() {
 	m_released = false;
 }
 
-GodotNetMessageIn::GodotNetMessageIn(ISteamNetworkingMessage* msg) {
+GodotNetMessageIn::GodotNetMessageIn(ISteamNetworkingMessage *msg) {
 	m_data = msg->m_pData;
 	m_sizeBytes = msg->m_cbSize;
 	m_pointer = 0;
@@ -243,7 +255,12 @@ void GodotNetMessageIn::Release() {
 			GDPrint("Failed to get, out of bounds");           \
 			return type();                                     \
 		}                                                      \
-															   \
+                                                               \
+		if (m_released) {                                      \
+			GDPrint("Failed to get, message was released");    \
+			return type();                                     \
+		}                                                      \
+                                                               \
 		type value = *(type *)((uint8_t *)m_data + m_pointer); \
 		m_pointer += sizeof(type);                             \
 		return value;                                          \
@@ -267,9 +284,14 @@ Vector2 GodotNetMessageIn::GetVector2() {
 		return Vector2();
 	}
 
-	float x = *(float*)((uint8_t*)m_data + m_pointer);
+	if (m_released) {
+		GDPrint("Failed to get, message was released");
+		return Vector2();
+	}
+
+	float x = *(float *)((uint8_t *)m_data + m_pointer);
 	m_pointer += sizeof(float);
-	float y = *(float*)((uint8_t*)m_data + m_pointer);
+	float y = *(float *)((uint8_t *)m_data + m_pointer);
 	m_pointer += sizeof(float);
 
 	return Vector2(x, y);
@@ -281,11 +303,16 @@ Vector3 GodotNetMessageIn::GetVector3() {
 		return Vector3();
 	}
 
-	float x = *(float*)((uint8_t*)m_data + m_pointer);
+	if (m_released) {
+		GDPrint("Failed to get, message was released");
+		return Vector3();
+	}
+
+	float x = *(float *)((uint8_t *)m_data + m_pointer);
 	m_pointer += sizeof(float);
-	float y = *(float*)((uint8_t*)m_data + m_pointer);
+	float y = *(float *)((uint8_t *)m_data + m_pointer);
 	m_pointer += sizeof(float);
-	float z = *(float*)((uint8_t*)m_data + m_pointer);
+	float z = *(float *)((uint8_t *)m_data + m_pointer);
 	m_pointer += sizeof(float);
 
 	return Vector3(x, y, z);
@@ -297,13 +324,18 @@ Quaternion GodotNetMessageIn::GetQuaternion() {
 		return Quaternion();
 	}
 
-	float x = *(float*)((uint8_t*)m_data + m_pointer);
+	if (m_released) {
+		GDPrint("Failed to get, message was released");
+		return Quaternion();
+	}
+
+	float x = *(float *)((uint8_t *)m_data + m_pointer);
 	m_pointer += sizeof(float);
-	float y = *(float*)((uint8_t*)m_data + m_pointer);
+	float y = *(float *)((uint8_t *)m_data + m_pointer);
 	m_pointer += sizeof(float);
-	float z = *(float*)((uint8_t*)m_data + m_pointer);
+	float z = *(float *)((uint8_t *)m_data + m_pointer);
 	m_pointer += sizeof(float);
-	float w = *(float*)((uint8_t*)m_data + m_pointer);
+	float w = *(float *)((uint8_t *)m_data + m_pointer);
 	m_pointer += sizeof(float);
 
 	return Quaternion(x, y, z, w);
@@ -320,9 +352,9 @@ void GodotNetServer::_bind_methods() {
 	ClassDB::bind_static_method("GodotNetServer", D_METHOD("set_on_client_connected", "func"), &GodotNetServer::SetOnClientConnected);
 	ClassDB::bind_static_method("GodotNetServer", D_METHOD("set_on_client_disconnected", "func"), &GodotNetServer::SetOnClientDisconnected);
 
-	ClassDB::bind_static_method("GodotNetServer", D_METHOD("send_to", "clientID", "msg", "flags"), &GodotNetServer::SendTo);
-	ClassDB::bind_static_method("GodotNetServer", D_METHOD("send_to_all", "msg", "flags"), &GodotNetServer::SendToAll);
-	ClassDB::bind_static_method("GodotNetServer", D_METHOD("send_to_all_except", "clientID", "msg", "flags"), &GodotNetServer::SendToAllExcept);
+	ClassDB::bind_static_method("GodotNetServer", D_METHOD("send_to", "clientID", "msg", "flags", "lane"), &GodotNetServer::SendTo);
+	ClassDB::bind_static_method("GodotNetServer", D_METHOD("send_to_all", "msg", "flags", "lane"), &GodotNetServer::SendToAll);
+	ClassDB::bind_static_method("GodotNetServer", D_METHOD("send_to_all_except", "clientID", "msg", "flags", "lane"), &GodotNetServer::SendToAllExcept);
 }
 
 HSteamListenSocket GodotNetServer::m_listenSocket;
@@ -345,7 +377,7 @@ bool GodotNetServer::HostServer(uint16_t port) {
 	addr.m_port = port;
 
 	SteamNetworkingConfigValue_t opt;
-	opt.SetPtr(k_ESteamNetworkingConfig_Callback_ConnectionStatusChanged, (void*)GodotNetServer::OnSteamNetConnectionStatusChanged);
+	opt.SetPtr(k_ESteamNetworkingConfig_Callback_ConnectionStatusChanged, (void *)GodotNetServer::OnSteamNetConnectionStatusChanged);
 	m_listenSocket = pInterface->CreateListenSocketIP(addr, 1, &opt);
 	if (m_listenSocket == k_HSteamListenSocket_Invalid) {
 		GDPrint("Failed to create listen socket");
@@ -368,7 +400,7 @@ bool GodotNetServer::HostServer(uint16_t port) {
 	return true;
 }
 
-void GodotNetServer::OnSteamNetConnectionStatusChanged(SteamNetConnectionStatusChangedCallback_t* pInfo) {
+void GodotNetServer::OnSteamNetConnectionStatusChanged(SteamNetConnectionStatusChangedCallback_t *pInfo) {
 	switch (pInfo->m_info.m_eState) {
 		case k_ESteamNetworkingConnectionState_None:
 			break;
@@ -388,10 +420,9 @@ void GodotNetServer::OnSteamNetConnectionStatusChanged(SteamNetConnectionStatusC
 					GDPrint("Connection from %s closed", pInfo->m_info.m_szConnectionDescription);
 					m_onClientDisconnected.call(it->m_clientID);
 					m_connections.erase(*it);
-				}
-				else {
+				} else {
 					GDPrint("Connection closed, but it was not found in the client list");
-				}				
+				}
 			}
 
 			pInterface->CloseConnection(pInfo->m_hConn, 0, nullptr, false);
@@ -421,6 +452,12 @@ void GodotNetServer::OnSteamNetConnectionStatusChanged(SteamNetConnectionStatusC
 			if (!pInterface->SetConnectionPollGroup(pInfo->m_hConn, m_pollGroup)) {
 				pInterface->CloseConnection(pInfo->m_hConn, 0, nullptr, false);
 				GDPrint("Failed to set connection poll group");
+			}
+
+			if (pInterface->ConfigureConnectionLanes(pInfo->m_hConn, NUM_LANES, LANE_PRIORITIES, NULL) != k_EResultOK) {
+				pInterface->CloseConnection(pInfo->m_hConn, 0, nullptr, false);
+				GDPrint("Failed to configure connection lanes");
+				break;
 			}
 
 			static uint32_t clientID = 0;
@@ -511,7 +548,7 @@ void GodotNetServer::SetOnClientDisconnected(Callable func) {
 	m_onClientDisconnected = func;
 }
 
-void GodotNetServer::PollThread(void* arg) {
+void GodotNetServer::PollThread(void *arg) {
 	m_runningMutex.lock();
 	while (m_running) {
 		m_runningMutex.unlock();
@@ -546,16 +583,40 @@ void GodotNetServer::Poll() {
 			break;
 		}
 
-		GodotNetMessageIn *msg = memnew(GodotNetMessageIn(message));
-		if (!m_onMessage.is_null()) {
-			m_onMessage.call(msg, (uint32_t)message->m_nConnUserData);
+		if (!m_onMessage.is_null() && message->GetSize() >= sizeof(uint16_t)) {
+			const void *data = message->GetData();
+			uint16_t packetId = ((uint16_t *)data)[0];
+			uint32_t clientId = (uint32_t)message->m_nConnUserData;
+
+			// GDPrint("Received message, packetId: %u, clientId: %u, size: %u", packetId, clientId, message->GetSize());
+
+			if (packetId == 1) {
+				// VOIP packet, broadcast to all clients except the sender
+				*(uint32_t *)((uint8_t *)data + sizeof(uint16_t)) = clientId;
+				for (int i = 0; i < m_connections.size(); i++) {
+					if (m_connections[i].m_clientID == clientId) {
+						continue;
+					}
+
+					// Implicitly on lane 0 (voip lane)
+					pInterface->SendMessageToConnection(m_connections[i].m_connection, data, message->GetSize(), k_nSteamNetworkingSend_NoDelay, nullptr);
+				}
+
+				message->Release();
+				continue;
+			}
+
+			Ref<GodotNetMessageIn> msg = memnew(GodotNetMessageIn(message));
+			m_onMessage.call(msg, clientId);
+		} else {
+			message->Release();
 		}
 	}
 
 	pInterface->RunCallbacks();
 }
 
-void GodotNetServer::SendTo(uint32_t clientID, GodotNetMessageOut *msg, int flags) {
+void GodotNetServer::SendTo(uint32_t clientID, Ref<GodotNetMessageOut> msg, int flags, uint16_t lane) {
 	if (pInterface == nullptr) {
 		return;
 	}
@@ -572,20 +633,38 @@ void GodotNetServer::SendTo(uint32_t clientID, GodotNetMessageOut *msg, int flag
 		return;
 	}
 
-	pInterface->SendMessageToConnection(it->m_connection, msg->GetData(), msg->GetSize(), flags, nullptr);
+	SteamNetworkingMessage_t *netMsg = pUtils->AllocateMessage(0);
+	netMsg->m_conn = it->m_connection;
+	netMsg->m_nFlags = flags;
+	netMsg->m_idxLane = lane;
+
+	msg->RemoveOwnership();
+	netMsg->m_pData = msg->GetData();
+	netMsg->m_cbSize = msg->GetSize();
+	netMsg->m_pfnFreeData = [](SteamNetworkingMessage_t *data) {
+		memfree(data->m_pData);
+	};
+
+	pInterface->SendMessages(1, &netMsg, nullptr);
 }
 
-void GodotNetServer::SendToAll(GodotNetMessageOut *msg, int flags) {
+void GodotNetServer::SendToAll(Ref<GodotNetMessageOut> msg, int flags, uint16_t lane) {
 	if (pInterface == nullptr) {
 		return;
 	}
 
 	for (int i = 0; i < m_connections.size(); i++) {
-		pInterface->SendMessageToConnection(m_connections[i].m_connection, msg->GetData(), msg->GetSize(), flags, nullptr);
+		SteamNetworkingMessage_t *netMsg = pUtils->AllocateMessage(msg->GetSize());
+		netMsg->m_conn = m_connections[i].m_connection;
+		netMsg->m_nFlags = flags;
+		netMsg->m_idxLane = lane;
+
+		memcpy(netMsg->m_pData, msg->GetData(), msg->GetSize());
+		pInterface->SendMessages(1, &netMsg, nullptr);
 	}
 }
 
-void GodotNetServer::SendToAllExcept(uint32_t clientID, GodotNetMessageOut *msg, int flags) {
+void GodotNetServer::SendToAllExcept(uint32_t clientID, Ref<GodotNetMessageOut> msg, int flags, uint16_t lane) {
 	if (pInterface == nullptr) {
 		return;
 	}
@@ -594,8 +673,14 @@ void GodotNetServer::SendToAllExcept(uint32_t clientID, GodotNetMessageOut *msg,
 		if (m_connections[i].m_clientID == clientID) {
 			continue;
 		}
-		
-		pInterface->SendMessageToConnection(m_connections[i].m_connection, msg->GetData(), msg->GetSize(), flags, nullptr);
+
+		SteamNetworkingMessage_t *netMsg = pUtils->AllocateMessage(msg->GetSize());
+		netMsg->m_conn = m_connections[i].m_connection;
+		netMsg->m_nFlags = flags;
+		netMsg->m_idxLane = lane;
+
+		memcpy(netMsg->m_pData, msg->GetData(), msg->GetSize());
+		pInterface->SendMessages(1, &netMsg, nullptr);
 	}
 }
 
@@ -608,7 +693,7 @@ void GodotNetClient::_bind_methods() {
 	ClassDB::bind_static_method("GodotNetClient", D_METHOD("set_on_connected", "func"), &GodotNetClient::SetOnConnected);
 	ClassDB::bind_static_method("GodotNetClient", D_METHOD("set_on_disconnected", "func"), &GodotNetClient::SetOnDisconnected);
 
-	ClassDB::bind_static_method("GodotNetClient", D_METHOD("send", "msg", "flags"), &GodotNetClient::Send);
+	ClassDB::bind_static_method("GodotNetClient", D_METHOD("send", "msg", "flags", "lane"), &GodotNetClient::Send);
 }
 
 HSteamNetConnection GodotNetClient::m_connection;
@@ -618,6 +703,7 @@ Callable GodotNetClient::m_onDisconnected;
 Thread GodotNetClient::m_pollThread;
 bool GodotNetClient::m_running = false;
 Mutex GodotNetClient::m_runningMutex;
+HashMap<uint16_t, AudioStreamPlaybackNetReceive *> GodotNetClient::m_audioReceivers;
 
 bool GodotNetClient::ConnectServer(String address, uint16_t port) {
 	if (pInterface == nullptr) {
@@ -629,10 +715,16 @@ bool GodotNetClient::ConnectServer(String address, uint16_t port) {
 	addr.m_port = port;
 
 	SteamNetworkingConfigValue_t opt;
-	opt.SetPtr(k_ESteamNetworkingConfig_Callback_ConnectionStatusChanged, (void*)GodotNetClient::OnSteamNetConnectionStatusChanged);
+	opt.SetPtr(k_ESteamNetworkingConfig_Callback_ConnectionStatusChanged, (void *)GodotNetClient::OnSteamNetConnectionStatusChanged);
 	m_connection = pInterface->ConnectByIPAddress(addr, 1, &opt);
 	if (m_connection == k_HSteamNetConnection_Invalid) {
 		GDPrint("Failed to connect to server");
+		return false;
+	}
+
+	if (pInterface->ConfigureConnectionLanes(m_connection, NUM_LANES, LANE_PRIORITIES, NULL) != k_EResultOK) {
+		pInterface->CloseConnection(m_connection, 0, nullptr, false);
+		GDPrint("Failed to configure connection lanes");
 		return false;
 	}
 
@@ -704,7 +796,7 @@ void GodotNetClient::SetOnDisconnected(Callable func) {
 	m_onDisconnected = func;
 }
 
-void GodotNetClient::PollThread(void* arg) {
+void GodotNetClient::PollThread(void *arg) {
 	m_runningMutex.lock();
 	while (m_running) {
 		m_runningMutex.unlock();
@@ -728,7 +820,7 @@ void GodotNetClient::Poll() {
 	}
 
 	while (true) {
-		ISteamNetworkingMessage* message = nullptr;
+		ISteamNetworkingMessage *message = nullptr;
 		int numMessages = pInterface->ReceiveMessagesOnConnection(m_connection, &message, 1);
 
 		if (numMessages == 0) {
@@ -741,16 +833,39 @@ void GodotNetClient::Poll() {
 			break;
 		}
 
-		GodotNetMessageIn* msg = memnew(GodotNetMessageIn(message));
-		if (!m_onMessage.is_null()) {
-			m_onMessage.call(msg);
+		if (message->GetSize() >= sizeof(uint16_t)) {
+			const void *data = message->GetData();
+			uint16_t packetId = ((uint16_t *)data)[0];
+
+			// GDPrint("Received message, packetId: %u, size: %u", packetId, message->GetSize());
+
+			if (packetId == 1) {
+				// VOIP packet
+				uint32_t clientId = *(uint32_t *)((uint8_t *)data + sizeof(uint16_t));
+				if (m_audioReceivers.has(clientId)) {
+					AudioStreamPlaybackNetReceive *receiver = m_audioReceivers[clientId];
+					const void* audioData = (uint8_t *)data + sizeof(uint16_t) + sizeof(uint32_t);
+					uint32_t audioSize = message->GetSize() - sizeof(uint16_t) - sizeof(uint32_t);
+					receiver->add_buffer(audioData, audioSize);
+				}
+
+				message->Release();
+				continue;
+			}
+
+			Ref<GodotNetMessageIn> msg = memnew(GodotNetMessageIn(message));
+			if (!m_onMessage.is_null()) {
+				m_onMessage.call(msg);
+			}
+		} else {
+			message->Release();
 		}
 	}
 
 	pInterface->RunCallbacks();
 }
 
-void GodotNetClient::Send(GodotNetMessageOut* msg, int flags) {
+void GodotNetClient::Send(Ref<GodotNetMessageOut> msg, int flags, uint16_t lane) {
 	if (pInterface == nullptr) {
 		return;
 	}
@@ -760,5 +875,56 @@ void GodotNetClient::Send(GodotNetMessageOut* msg, int flags) {
 		return;
 	}
 
-	pInterface->SendMessageToConnection(m_connection, msg->GetData(), msg->GetSize(), flags, nullptr);
+	SteamNetworkingMessage_t *netMsg = pUtils->AllocateMessage(0);
+	netMsg->m_conn = m_connection;
+	netMsg->m_nFlags = flags;
+	netMsg->m_idxLane = lane;
+
+	msg->RemoveOwnership();
+	netMsg->m_pData = msg->GetData();
+	netMsg->m_cbSize = msg->GetSize();
+	netMsg->m_pfnFreeData = [](SteamNetworkingMessage_t *data) {
+		memfree(data->m_pData);
+	};
+
+	pInterface->SendMessages(1, &netMsg, nullptr);
+}
+
+void GodotNetClient::SendRaw(void *data, uint32_t size, int flags, uint16_t lane) {
+	if (pInterface == nullptr) {
+		return;
+	}
+
+	if (m_connection == k_HSteamNetConnection_Invalid) {
+		GDPrint("Failed to send message, not connected");
+		return;
+	}
+
+	SteamNetworkingMessage_t *netMsg = pUtils->AllocateMessage(size);
+	netMsg->m_conn = m_connection;
+	netMsg->m_nFlags = flags;
+	netMsg->m_idxLane = lane;
+
+	memcpy(netMsg->m_pData, data, size);
+	pInterface->SendMessages(1, &netMsg, nullptr);
+}
+
+void GodotNetClient::RegisterAudioReceiver(uint16_t clientId, AudioStreamPlaybackNetReceive* receiver) {
+	if (m_audioReceivers.has(clientId)) {
+		GDPrint("Audio receiver already registered for client %u", clientId);
+		return;
+	}
+
+	GDPrint("Registering audio receiver for client %u", clientId);
+	m_audioReceivers[clientId] = receiver;
+}
+
+void GodotNetClient::UnregisterAudioReceiver(uint16_t clientId) {
+	if (!m_audioReceivers.has(clientId)) {
+		GDPrint("Audio receiver not registered for client %u", clientId);
+		return;
+	}
+
+	GDPrint("Unregistering audio receiver for client %u", clientId);
+	m_audioReceivers.erase(clientId);
 }
