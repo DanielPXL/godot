@@ -66,6 +66,7 @@ public:
 	void add_frames(const AudioFrame* p_frames, uint32_t p_frameCount);
 	void add_buffer(const void* p_data, uint32_t size);
 	uint32_t frames_available_write() const;
+	uint32_t frames_available_read() const;
 
 	AudioStreamPlaybackNetReceive();
 	~AudioStreamPlaybackNetReceive();

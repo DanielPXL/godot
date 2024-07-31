@@ -1,5 +1,6 @@
 #include "GodotNetworkingSockets.h"
 #include "steam/isteamnetworkingutils.h"
+#include "voip.h"
 #include <chrono>
 #include <cstdarg>
 
@@ -57,6 +58,8 @@ bool GodotNetSockets::Init() {
 
 	pInterface = SteamNetworkingSockets();
 	pUtils = SteamNetworkingUtils();
+
+	VOIP::init();
 
 	GDPrint("Game networking sockets initialized");
 	return true;
@@ -842,10 +845,11 @@ void GodotNetClient::Poll() {
 			if (packetId == 1) {
 				// VOIP packet
 				uint32_t clientId = *(uint32_t *)((uint8_t *)data + sizeof(uint16_t));
+				uint32_t voipPacketId = *(uint32_t *)((uint8_t *)data + sizeof(uint16_t) + sizeof(uint32_t));
 				if (m_audioReceivers.has(clientId)) {
 					AudioStreamPlaybackNetReceive *receiver = m_audioReceivers[clientId];
-					const void* audioData = (uint8_t *)data + sizeof(uint16_t) + sizeof(uint32_t);
-					uint32_t audioSize = message->GetSize() - sizeof(uint16_t) - sizeof(uint32_t);
+					const void* audioData = (uint8_t *)data + sizeof(uint16_t) + 2 * sizeof(uint32_t);
+					uint32_t audioSize = message->GetSize() - sizeof(uint16_t) - 2 * sizeof(uint32_t);
 					receiver->add_buffer(audioData, audioSize);
 				}
 
