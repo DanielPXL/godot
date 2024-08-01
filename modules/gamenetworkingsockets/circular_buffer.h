@@ -1,4 +1,6 @@
-#pragma once
+#ifndef GODOTNETWORKINGSOCKETS_CIRCULAR_BUFFER_H
+#define GODOTNETWORKINGSOCKETS_CIRCULAR_BUFFER_H
+
 #include "core/object/ref_counted.h"
 
 template <typename T>
@@ -70,3 +72,5 @@ template <typename T>
 size_t CircularBuffer<T>::size() {
 	return m_size;
 }
+
+#endif // GODOTNETWORKINGSOCKETS_CIRCULAR_BUFFER_H

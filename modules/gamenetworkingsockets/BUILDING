@@ -1,4 +1,4 @@
-Before being able to compile Godot with this module the GameNetworkingSockets library needs to be compiled separately because configuring it inside SCons is too much of a hassle for me.
+Before being able to compile Godot with this module the GameNetworkingSockets library and opus need to be compiled separately because configuring them inside SCons is too much of a hassle for me.
 
 ----- Windows -----
 
@@ -12,5 +12,12 @@ Open a Visual Studio command prompt from the GameNetworkingSockets directory nex
 > copy .\src\GameNetworkingSockets.lib .\..\..\..\..\GameNetworkingSockets.<platform>.<target>.[dev].<arch>.[mono].lib
 
 (e.g. copy .\src\GameNetworkingSockets.lib .\..\..\GameNetworkingSockets.windows.editor.x86_64.lib)
+
+Do the same for opus.
+
+> cmake -S . -B build -G Ninja -DOPUS_BUILD_SHARED_LIBRARY=ON
+> cd build
+> ninja
+> copy .\src\opus.lib .\..\..\..\..\opus.<platform>.<target>.[dev].<arch>.[mono].lib
 
 Then compile Godot like usual. Don't forget to add the shared libraries to the Godot executable.

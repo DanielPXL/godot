@@ -44,7 +44,7 @@ void AudioStreamNetReceive::set_user_id(uint16_t p_user_id) {
 
 AudioStreamPlaybackNetReceive::AudioStreamPlaybackNetReceive() {
 	m_active = false;
-	m_bufferSize = 48000 * 60 / 1000; // 60ms buffer
+	m_bufferSize = 48000 * 100 / 1000; // 100ms buffer
 	m_buffer = memnew_arr(AudioFrame, m_bufferSize);
 	m_readPos = 0;
 	m_writePos = 0;
@@ -105,13 +105,13 @@ void AudioStreamPlaybackNetReceive::start(double p_from_pos) {
 		return;
 	}
 
-	GodotNetClient::RegisterAudioReceiver(m_stream->user_id, this);
+	VOIP::RegisterAudioReceiver(m_stream->user_id, this);
 	m_active = true;
 }
 
 void AudioStreamPlaybackNetReceive::stop() {
 	if (m_active) {
-		GodotNetClient::UnregisterAudioReceiver(m_stream->user_id);
+		VOIP::UnregisterAudioReceiver(m_stream->user_id);
 		m_active = false;
 	}
 }

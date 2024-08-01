@@ -706,7 +706,6 @@ Callable GodotNetClient::m_onDisconnected;
 Thread GodotNetClient::m_pollThread;
 bool GodotNetClient::m_running = false;
 Mutex GodotNetClient::m_runningMutex;
-HashMap<uint16_t, AudioStreamPlaybackNetReceive *> GodotNetClient::m_audioReceivers;
 
 bool GodotNetClient::ConnectServer(String address, uint16_t port) {
 	if (pInterface == nullptr) {
@@ -846,12 +845,10 @@ void GodotNetClient::Poll() {
 				// VOIP packet
 				uint32_t clientId = *(uint32_t *)((uint8_t *)data + sizeof(uint16_t));
 				uint32_t voipPacketId = *(uint32_t *)((uint8_t *)data + sizeof(uint16_t) + sizeof(uint32_t));
-				if (m_audioReceivers.has(clientId)) {
-					AudioStreamPlaybackNetReceive *receiver = m_audioReceivers[clientId];
-					const void* audioData = (uint8_t *)data + sizeof(uint16_t) + 2 * sizeof(uint32_t);
-					uint32_t audioSize = message->GetSize() - sizeof(uint16_t) - 2 * sizeof(uint32_t);
-					receiver->add_buffer(audioData, audioSize);
-				}
+				int64_t timestamp = *(int64_t *)((uint8_t *)data + sizeof(uint16_t) + 2 * sizeof(uint32_t));
+				const void* audioData = (uint8_t *)data + sizeof(uint16_t) + 2 * sizeof(uint32_t) + sizeof(int64_t);
+				uint32_t audioSize = message->GetSize() - sizeof(uint16_t) - 2 * sizeof(uint32_t) - sizeof(int64_t);
+				VOIP::receive(clientId, voipPacketId, timestamp, audioData, audioSize);
 
 				message->Release();
 				continue;
@@ -911,24 +908,4 @@ void GodotNetClient::SendRaw(void *data, uint32_t size, int flags, uint16_t lane
 
 	memcpy(netMsg->m_pData, data, size);
 	pInterface->SendMessages(1, &netMsg, nullptr);
-}
-
-void GodotNetClient::RegisterAudioReceiver(uint16_t clientId, AudioStreamPlaybackNetReceive* receiver) {
-	if (m_audioReceivers.has(clientId)) {
-		GDPrint("Audio receiver already registered for client %u", clientId);
-		return;
-	}
-
-	GDPrint("Registering audio receiver for client %u", clientId);
-	m_audioReceivers[clientId] = receiver;
-}
-
-void GodotNetClient::UnregisterAudioReceiver(uint16_t clientId) {
-	if (!m_audioReceivers.has(clientId)) {
-		GDPrint("Audio receiver not registered for client %u", clientId);
-		return;
-	}
-
-	GDPrint("Unregistering audio receiver for client %u", clientId);
-	m_audioReceivers.erase(clientId);
 }

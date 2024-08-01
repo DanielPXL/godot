@@ -6,7 +6,6 @@
 #include "core/object/ref_counted.h"
 #include "core/templates/vector.h"
 #include "steam/steamnetworkingsockets.h"
-#include "audio_stream_netreceive.h"
 
 class GodotNetSockets : public RefCounted {
 	GDCLASS(GodotNetSockets, RefCounted);
@@ -145,7 +144,6 @@ class GodotNetClient : public RefCounted {
 	static Thread m_pollThread;
 	static bool m_running;
 	static Mutex m_runningMutex;
-	static HashMap<uint16_t, AudioStreamPlaybackNetReceive*> m_audioReceivers;
 
 	static Callable m_onMessage;
 	static Callable m_onConnected;
@@ -169,9 +167,6 @@ public:
 
 	static void Send(Ref<GodotNetMessageOut> msg, int flags, uint16_t lane);
 	static void SendRaw(void* data, uint32_t size, int flags, uint16_t lane);
-
-	static void RegisterAudioReceiver(uint16_t clientId, AudioStreamPlaybackNetReceive* receiver);
-	static void UnregisterAudioReceiver(uint16_t clientId);
 };
 
 #endif
