@@ -1,3 +1,6 @@
 [submodule "modules/gamenetworkingsockets/GameNetworkingSockets"]
 	path = modules/gamenetworkingsockets/GameNetworkingSockets
 	url = https://github.com/ValveSoftware/GameNetworkingSockets
+[submodule "modules/gamenetworkingsockets/opus"]
+	path = modules/gamenetworkingsockets/opus
+	url = https://github.com/xiph/opus.git
