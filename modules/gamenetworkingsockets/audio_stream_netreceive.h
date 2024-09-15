@@ -67,6 +67,7 @@ public:
 	void add_buffer(const void* p_data, uint32_t size);
 	uint32_t frames_available_write() const;
 	uint32_t frames_available_read() const;
+	uint32_t get_size() const;
 
 	AudioStreamPlaybackNetReceive();
 	~AudioStreamPlaybackNetReceive();

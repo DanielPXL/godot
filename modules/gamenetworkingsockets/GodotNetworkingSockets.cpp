@@ -845,7 +845,7 @@ void GodotNetClient::Poll() {
 				// VOIP packet
 				uint32_t clientId = *(uint32_t *)((uint8_t *)data + sizeof(uint16_t));
 				uint32_t voipPacketId = *(uint32_t *)((uint8_t *)data + sizeof(uint16_t) + sizeof(uint32_t));
-				int64_t timestamp = *(int64_t *)((uint8_t *)data + sizeof(uint16_t) + 2 * sizeof(uint32_t));
+				uint64_t timestamp = *(uint64_t *)((uint8_t *)data + sizeof(uint16_t) + 2 * sizeof(uint32_t));
 				const void* audioData = (uint8_t *)data + sizeof(uint16_t) + 2 * sizeof(uint32_t) + sizeof(int64_t);
 				uint32_t audioSize = message->GetSize() - sizeof(uint16_t) - 2 * sizeof(uint32_t) - sizeof(int64_t);
 				VOIP::receive(clientId, voipPacketId, timestamp, audioData, audioSize);

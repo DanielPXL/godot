@@ -4,6 +4,7 @@
 #include "GodotNetworkingSockets.h"
 #include "audio_stream_netreceive.h"
 #include "opus.h"
+#include "speexdsp/speex_jitter.h"
 
 namespace VOIP {
 	// Opus requires 5, 10, 20, 40 or 60ms frames at 48000Hz
@@ -16,15 +17,15 @@ namespace VOIP {
 
 	void init();
 	void send(const AudioFrame *data, uint32_t size);
-	void receive(uint16_t clientId, uint32_t packetId, int64_t timestamp, const void *data, uint32_t size);
+	void receive(uint16_t clientId, uint32_t packetId, uint64_t timestamp, const void *data, uint32_t size);
 
 	void RegisterAudioReceiver(uint16_t clientId, AudioStreamPlaybackNetReceive *receiver);
 	void UnregisterAudioReceiver(uint16_t clientId);
 
 	struct AudioReceiver {
 		AudioStreamPlaybackNetReceive *stream = nullptr;
+		JitterBuffer *jitterBuffer = nullptr;
 		OpusDecoder *decoder = nullptr;
-		uint32_t lastPacketId = 0;
 	};
 };
 

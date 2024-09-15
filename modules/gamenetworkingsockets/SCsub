@@ -9,5 +9,5 @@ env.Append(LIBS = ["GameNetworkingSockets"])
 env.Append(LIBS = ["opus"])
 env.Append(LIBPATH = ["%s"])
 
-src_list = ["register_types.cpp", "GodotNetworkingSockets.cpp", "audio_effect_netsend.cpp", "audio_stream_netreceive.cpp", "voip.cpp"]
+src_list = ["register_types.cpp", "GodotNetworkingSockets.cpp", "audio_effect_netsend.cpp", "audio_stream_netreceive.cpp", "voip.cpp", "speexdsp/jitter.c" ]
 env.add_source_files(env.modules_sources, src_list)

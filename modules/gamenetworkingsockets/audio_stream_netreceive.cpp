@@ -166,3 +166,7 @@ uint32_t AudioStreamPlaybackNetReceive::frames_available_write() const {
 uint32_t AudioStreamPlaybackNetReceive::frames_available_read() const {
 	return (m_writePos - m_readPos + m_bufferSize) % m_bufferSize;
 }
+
+uint32_t AudioStreamPlaybackNetReceive::get_size() const {
+	return m_bufferSize;
+}
