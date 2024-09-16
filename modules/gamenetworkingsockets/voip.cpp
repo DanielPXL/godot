@@ -12,7 +12,7 @@ void *packetBuffer = new uint8_t[VOIP::PACKET_HEADER_SIZE + VOIP::MAX_ENCODED_SI
 uint32_t sendVoipId = 1;
 OpusEncoder *encoder = nullptr;
 Thread decoderThread;
-HashMap<uint16_t, VOIP::AudioReceiver *> audioReceivers;
+HashMap<uint32_t, VOIP::AudioReceiver *> audioReceivers;
 Mutex audioReceiversMutex;
 float *decodeBuffer = new float[VOIP::FRAME_SIZE];
 
@@ -140,7 +140,7 @@ void JitterBufferDestroyCallback(void *data) {
 	memfree(data);
 }
 
-void VOIP::RegisterAudioReceiver(uint16_t clientId, AudioStreamPlaybackNetReceive *stream) {
+void VOIP::RegisterAudioReceiver(uint32_t clientId, AudioStreamPlaybackNetReceive *stream) {
 	audioReceiversMutex.lock();
 	if (audioReceivers.has(clientId)) {
 		print_error(String("[VOIP] Audio receiver already registered for client") + String::num(clientId));
@@ -163,7 +163,7 @@ void VOIP::RegisterAudioReceiver(uint16_t clientId, AudioStreamPlaybackNetReceiv
 	audioReceiversMutex.unlock();
 }
 
-void VOIP::UnregisterAudioReceiver(uint16_t clientId) {
+void VOIP::UnregisterAudioReceiver(uint32_t clientId) {
 	audioReceiversMutex.lock();
 	if (!audioReceivers.has(clientId)) {
 		print_error(String("[VOIP] No audio receiver registered for client") + String::num(clientId));

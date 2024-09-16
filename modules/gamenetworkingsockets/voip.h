@@ -19,8 +19,8 @@ namespace VOIP {
 	void send(const AudioFrame *data, uint32_t size);
 	void receive(uint16_t clientId, uint32_t packetId, uint64_t timestamp, const void *data, uint32_t size);
 
-	void RegisterAudioReceiver(uint16_t clientId, AudioStreamPlaybackNetReceive *receiver);
-	void UnregisterAudioReceiver(uint16_t clientId);
+	void RegisterAudioReceiver(uint32_t clientId, AudioStreamPlaybackNetReceive *receiver);
+	void UnregisterAudioReceiver(uint32_t clientId);
 
 	struct AudioReceiver {
 		AudioStreamPlaybackNetReceive *stream = nullptr;

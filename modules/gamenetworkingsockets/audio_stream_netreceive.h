@@ -11,7 +11,7 @@ class AudioStreamNetReceive : public AudioStream {
 	friend class AudioStreamPlaybackNetReceive;
 
 private:
-	uint16_t user_id;
+	uint32_t user_id;
 
 protected:
 	static void _bind_methods();
@@ -24,8 +24,8 @@ public:
 
 	virtual bool is_monophonic() const override;
 
-	uint16_t get_user_id() const;
-	void set_user_id(uint16_t p_user_id);
+	uint32_t get_user_id() const;
+	void set_user_id(uint32_t user_id);
 
 	AudioStreamNetReceive();
 };

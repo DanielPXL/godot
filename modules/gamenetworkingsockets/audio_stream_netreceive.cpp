@@ -34,12 +34,12 @@ bool AudioStreamNetReceive::is_monophonic() const {
 	return true;
 }
 
-uint16_t AudioStreamNetReceive::get_user_id() const {
+uint32_t AudioStreamNetReceive::get_user_id() const {
 	return user_id;
 }
 
-void AudioStreamNetReceive::set_user_id(uint16_t p_user_id) {
-	user_id = p_user_id;
+void AudioStreamNetReceive::set_user_id(uint32_t user_id) {
+	this->user_id = user_id;
 }
 
 AudioStreamPlaybackNetReceive::AudioStreamPlaybackNetReceive() {
