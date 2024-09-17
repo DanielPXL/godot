@@ -30,7 +30,7 @@ void SendThread(void *args) {
 			*(uint16_t *)((uint8_t *)packetBuffer + 0) = 1; // Packet id for voip data
 			*(uint32_t *)((uint8_t *)packetBuffer + sizeof(uint16_t)) = 0; // User ID (filled in by server)
 			*(uint32_t *)((uint8_t *)packetBuffer + sizeof(uint16_t) + sizeof(uint32_t)) = sendVoipId; // VOIP ID
-			*(uint64_t *)((uint8_t *)packetBuffer + sizeof(uint16_t) + 2 * sizeof(uint32_t)) = Time::get_singleton()->get_ticks_msec(); // Timestamp
+			*(uint64_t *)((uint8_t *)packetBuffer + sizeof(uint16_t) + 2 * sizeof(uint32_t)) = (uint64_t)sendVoipId * (uint64_t)VOIP::FRAME_SIZE_MS; // Timestamp
 
 			sendVoipId++;
 

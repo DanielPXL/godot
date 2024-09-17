@@ -27,7 +27,7 @@ void GodotNetSockets::SetPrintFunction(Callable func) {
 	printFunction = func;
 }
 
-#if 1
+#if 0
 inline void GDPrint(const char *format, ...) {
 	if (printFunction.is_null()) {
 		return;
